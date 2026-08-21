@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "school": "Schoolnaam",
+          "username": "Gebruikersnaam",
+          "password": "Wachtwoord"
+        },
+        "description": "Voer de volledige schoolnaam en de Somtoday-inloggegevens van een leerling in."
+      }
+    },
+    "error": {
+      "invalid_auth": "Gebruikersnaam of wachtwoord is onjuist, of deze school gebruikt SSO/2FA.",
+      "cannot_connect": "Somtoday is niet bereikbaar of de schoolnaam is niet eenduidig."
+    }
+  },
+  "entity": {
+    "calendar": {
+      "timetable": {"name": "Rooster"}
+    },
+    "sensor": {
+      "latest_grade": {"name": "Laatste cijfer"}
+    }
+  }
+}
