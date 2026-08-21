@@ -2,5 +2,5 @@
   "name": "Somtoday",
   "content_in_root": false,
   "domains": ["somtoday"],
-  "homeassistant": ">=2024.4.0"
+  "homeassistant": "2024.4.0"
 }
