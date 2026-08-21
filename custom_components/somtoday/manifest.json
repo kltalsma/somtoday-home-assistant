@@ -1,0 +1,11 @@
+{
+  "domain": "somtoday",
+  "name": "Somtoday",
+  "version": "0.1.0",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/elisaado/somtoday-api-docs",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/elisaado/somtoday-api-docs/issues",
+  "requirements": []
+}
