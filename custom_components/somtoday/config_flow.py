@@ -10,7 +10,7 @@ from homeassistant.config_entries import ConfigFlow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import SomtodayClient
-from .const import CONF_PASSWORD, CONF_SCHOOL, CONF_USERNAME, DOMAIN
+from .const import CONF_PASSWORD, CONF_SCHOOL, CONF_TENANT_ID, CONF_USERNAME, DOMAIN
 from .exceptions import SomtodayAuthenticationError, SomtodayConnectionError
 
 
@@ -24,8 +24,7 @@ class SomtodayConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 session = async_get_clientsession(self.hass)
-                school = await SomtodayClient.find_school(session, user_input[CONF_SCHOOL])
-                client = SomtodayClient(session, school["uuid"], user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
+                client = SomtodayClient(session, user_input[CONF_TENANT_ID], user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
                 await client.async_login()
                 student = await client.async_get_student()
             except SomtodayAuthenticationError:
@@ -38,13 +37,14 @@ class SomtodayConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
                     title=f"Somtoday - {student.get('roepnaam', user_input[CONF_USERNAME])}",
-                    data={**user_input, "school_uuid": school["uuid"], "school_name": school["name"]},
+                    data=user_input,
                 )
 
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema({
                 vol.Required(CONF_SCHOOL): str,
+                vol.Required(CONF_TENANT_ID): str,
                 vol.Required(CONF_USERNAME): str,
                 vol.Required(CONF_PASSWORD): str,
             }),
