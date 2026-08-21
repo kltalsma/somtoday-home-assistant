@@ -4,15 +4,16 @@
       "user": {
         "data": {
           "school": "Schoolnaam",
+          "tenant_id": "Tenant-ID van de school",
           "username": "Gebruikersnaam",
           "password": "Wachtwoord"
         },
-        "description": "Voer de volledige schoolnaam en de Somtoday-inloggegevens van een leerling in."
+        "description": "Voer de schoolnaam, tenant-ID en Somtoday-inloggegevens van een leerling in. De tenant-ID staat in de URL https://inloggen.somtoday.nl/tenant/<tenant-ID> nadat je de school kiest."
       }
     },
     "error": {
       "invalid_auth": "Gebruikersnaam of wachtwoord is onjuist, of deze school gebruikt SSO/2FA.",
-      "cannot_connect": "Somtoday is niet bereikbaar of de schoolnaam is niet eenduidig."
+      "cannot_connect": "Somtoday is niet bereikbaar of de tenant-ID is onjuist."
     }
   },
   "entity": {
