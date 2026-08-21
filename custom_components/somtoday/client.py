@@ -6,13 +6,17 @@ use SSO; those installations cannot be configured with this integration.
 
 from __future__ import annotations
 
+import base64
 from datetime import date
+import hashlib
 import logging
+import secrets
 from typing import Any
+from urllib.parse import parse_qs, urljoin, urlparse
 
 from aiohttp import ClientError, ClientSession
 
-from .const import CLIENT_ID, ORGANISATIONS_URL, TOKEN_URL
+from .const import AUTHORIZE_URL, CLIENT_ID, REDIRECT_URI, TOKEN_URL
 from .exceptions import SomtodayAuthenticationError, SomtodayConnectionError
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,45 +25,81 @@ _LOGGER = logging.getLogger(__name__)
 class SomtodayClient:
     """Authenticated Somtoday API client."""
 
-    def __init__(self, session: ClientSession, school_uuid: str, username: str, password: str) -> None:
+    def __init__(self, session: ClientSession, tenant_id: str, username: str, password: str) -> None:
         """Initialize the client."""
         self._session = session
-        self._school_uuid = school_uuid
+        self._tenant_id = tenant_id
         self._username = username
         self._password = password
         self._access_token: str | None = None
         self._refresh_token: str | None = None
         self._api_url: str | None = None
 
-    @staticmethod
-    async def find_school(session: ClientSession, school_name: str) -> dict[str, str]:
-        """Resolve a school name to its public Somtoday organisation record."""
-        try:
-            async with session.get(ORGANISATIONS_URL, timeout=20) as response:
-                response.raise_for_status()
-                payload = await response.json(content_type=None)
-        except (ClientError, TimeoutError, ValueError) as err:
-            raise SomtodayConnectionError("Kon de Somtoday-scholenlijst niet ophalen") from err
-
-        organisations = payload[0].get("instellingen", []) if isinstance(payload, list) else []
-        normalized = school_name.casefold().strip()
-        exact = [item for item in organisations if item.get("naam", "").casefold().strip() == normalized]
-        matches = exact or [item for item in organisations if normalized in item.get("naam", "").casefold()]
-        if len(matches) != 1:
-            raise SomtodayConnectionError("School niet gevonden of niet eenduidig; gebruik de volledige schoolnaam")
-        school = matches[0]
-        return {"uuid": school["uuid"], "name": school["naam"], "city": school.get("plaats", "")}
-
     async def async_login(self) -> None:
-        """Acquire an API token using the native app's password grant."""
-        data = {
-            "grant_type": "password",
-            "username": f"{self._school_uuid}\\{self._username}",
-            "password": self._password,
-            "scope": "openid",
+        """Acquire an API token through the current Somtoday native-app flow."""
+        verifier = secrets.token_urlsafe(96)
+        challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+        parameters = {
+            "redirect_uri": REDIRECT_URI,
             "client_id": CLIENT_ID,
+            "state": secrets.token_urlsafe(16),
+            "response_type": "code",
+            "scope": "openid",
+            "tenant_uuid": self._tenant_id,
+            "session": "no_session",
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
         }
-        await self._async_token_request(data, is_login=True)
+        try:
+            async with self._session.get(AUTHORIZE_URL, params=parameters, allow_redirects=False, timeout=20) as response:
+                location = response.headers.get("Location")
+                response.raise_for_status()
+            if not location:
+                raise SomtodayConnectionError("Somtoday gaf geen inloglocatie terug")
+            login_url = urljoin(AUTHORIZE_URL, location)
+            auth = parse_qs(urlparse(login_url).query).get("auth", [None])[0]
+            if not auth:
+                raise SomtodayConnectionError("Somtoday gaf geen inlogcode terug")
+
+            # This response establishes the session cookie required by the login form.
+            async with self._session.get(login_url, allow_redirects=False, timeout=20) as response:
+                response.raise_for_status()
+            async with self._session.post(
+                "https://inloggen.somtoday.nl/?0-1.-panel-signInForm",
+                params={"auth": auth},
+                data={
+                    "loginLink": "x",
+                    "usernameFieldPanel:usernameFieldPanel_body:usernameField": self._username,
+                    "passwordFieldPanel:passwordFieldPanel_body:passwordField": self._password,
+                },
+                headers={"Origin": "https://inloggen.somtoday.nl"},
+                allow_redirects=False,
+                timeout=20,
+            ) as response:
+                location = response.headers.get("Location")
+                if response.status in (400, 401, 403) or not location:
+                    raise SomtodayAuthenticationError("Inloggen bij Somtoday is niet gelukt")
+                response.raise_for_status()
+        except SomtodayAuthenticationError:
+            raise
+        except (ClientError, TimeoutError, ValueError) as err:
+            raise SomtodayConnectionError("Kon de Somtoday-inlogpagina niet bereiken") from err
+
+        authorization_code = parse_qs(urlparse(location).query).get("code", [None])[0]
+        if not authorization_code:
+            raise SomtodayAuthenticationError("Somtoday vraagt een andere inlogmethode (SSO/2FA)")
+        await self._async_token_request(
+            {
+                "grant_type": "authorization_code",
+                "session": "no_session",
+                "scope": "openid",
+                "client_id": CLIENT_ID,
+                "tenant_uuid": self._tenant_id,
+                "code": authorization_code,
+                "code_verifier": verifier,
+            },
+            is_login=True,
+        )
 
     async def _async_token_request(self, data: dict[str, str], *, is_login: bool) -> None:
         try:
