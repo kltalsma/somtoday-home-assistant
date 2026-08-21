@@ -9,7 +9,7 @@ Deze custom integration haalt het Somtoday-rooster rechtstreeks op en maakt per 
 3. Voeg deze GitHub-repository toe met categorie **Integration**.
 4. Zoek naar **Somtoday**, installeer hem en herstart Home Assistant.
 5. Ga naar **Instellingen -> Apparaten en diensten -> Integratie toevoegen -> Somtoday**.
-6. Voeg elk kind afzonderlijk toe.
+6. Voeg elk kind afzonderlijk toe. De tenant-ID is het UUID-deel in `https://inloggen.somtoday.nl/tenant/<tenant-ID>` nadat je op de Somtoday-inlogpagina de school hebt gekozen.
 
 ## Handmatige installatie
 
