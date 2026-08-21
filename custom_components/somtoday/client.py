@@ -61,8 +61,17 @@ class SomtodayClient:
             if not auth:
                 raise SomtodayConnectionError("Somtoday gaf geen inlogcode terug")
 
-            # This response establishes the session cookie required by the login form.
+            # This response establishes the session cookie and redirects to the login form.
             async with self._session.get(login_url, allow_redirects=False, timeout=20) as response:
+                form_location = response.headers.get("Location")
+                response.raise_for_status()
+            if not form_location:
+                raise SomtodayConnectionError("Somtoday gaf geen loginformulier terug")
+            form_url = urljoin(login_url, form_location)
+            auth = parse_qs(urlparse(form_url).query).get("auth", [None])[0]
+            if not auth:
+                raise SomtodayConnectionError("Somtoday gaf geen geldige loginstatus terug")
+            async with self._session.get(form_url, allow_redirects=False, timeout=20) as response:
                 response.raise_for_status()
             async with self._session.post(
                 "https://inloggen.somtoday.nl/?0-1.-panel-signInForm",
